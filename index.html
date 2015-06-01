@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>vanitas</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <script src="js/three.min.js"></script>
+    <script src="js/OBJLoader.js"></script>
+    <style>
+    body {
+        background-color: #000000;
+        margin: 0px;
+        overflow: hidden;
+    }
+    </style>
+</head>
+
+<body>
+    <script>
+    var count = Math.round(getRandomArbitrary(-1, 35))
+    setInterval(function() {
+        document.location.reload(true)
+    }, 20000)
+
+    var camera, cubeCamera, scene, renderer
+    var megalith
+    var objectNum = 6
+    var objects = new Array()
+    var doneLoading = false
+
+    var positions = new Array(objectNum)
+    positions = [{
+        'x': 0,
+        'y': 0,
+        'z': 0
+    }, {
+        'x': -70,
+        'y': 0,
+        'z': 0
+    }, {
+        'x': 70,
+        'y': 0,
+        'z': 0
+    }, {
+        'x': 0,
+        'y': -20,
+        'z': 60
+    }, {
+        'x': 0,
+        'y': 20,
+        'z': 0
+    }] 
+
+    var fov = getRandomArbitrary(1, 80),
+        isUserInteracting = false,
+        onMouseDownMouseX = 0,
+        onMouseDownMouseY = 0,
+        lon = getRandomArbitrary(0, 180),
+        onMouseDownLon = 0,
+        lat = getRandomArbitrary(0, 60),
+        onMouseDownLat = 0,
+        phi = 0,
+        theta = 0
+
+    function init() {
+
+        camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 1, 1000)
+
+        scene = new THREE.Scene()
+
+        var mesh = new THREE.Mesh(new THREE.SphereGeometry(1000, 60, 40), new THREE.MeshBasicMaterial({
+            map: texture
+        }))
+        mesh.scale.x = -1
+        scene.add(mesh)
+
+        renderer = new THREE.WebGLRenderer({
+            antialias: true
+        })
+        renderer.setPixelRatio(window.devicePixelRatio)
+        renderer.setSize(window.innerWidth, window.innerHeight)
+
+        cubeCamera = new THREE.CubeCamera(1, 1000, 256)
+        cubeCamera.renderTarget.minFilter = THREE.LinearMipMapLinearFilter
+        scene.add(cubeCamera)
+
+        document.body.appendChild(renderer.domElement)
+
+        //
+
+        var material = new THREE.MeshBasicMaterial({
+            envMap: cubeCamera.renderTarget
+        })
+
+        // texture
+        var loadCount = 0
+        var manager = new THREE.LoadingManager()
+
+        // load and add models to scene
+        for (var i = 0; i < objectNum; i++) {
+            loader = new THREE.OBJLoader(manager)
+            loader.load('obj/' + i.toString() + '.obj', function(object) {
+                objects.push(object)
+                object.traverse(function(child) {
+                    child.material = material
+                })
+                object.scale.x = 30
+                object.scale.y = 30
+                object.scale.z = 30
+                var initPos = Math.round(getRandomArbitrary(0, positions.length - 1))
+                object.position.x = positions[initPos].x
+                object.position.y = positions[initPos].y
+                object.position.z = positions[initPos].z
+                object.rotation.x = 0
+                object.rotation.y = 0
+                object.rotation.z = 0
+                scene.add(object)
+                positions.splice(initPos, 1)
+            })
+
+        }
+
+        document.addEventListener('mousedown', onDocumentMouseDown, false)
+        document.addEventListener('mousewheel', onDocumentMouseWheel, false)
+        document.addEventListener('DOMMouseScroll', onDocumentMouseWheel, false)
+        window.addEventListener('resize', onWindowResized, false)
+        onWindowResized(null)
+    }
+
+    function onWindowResized(event) {
+        renderer.setSize(window.innerWidth, window.innerHeight)
+        camera.projectionMatrix.makePerspective(fov, window.innerWidth / window.innerHeight, 1, 1100)
+    }
+
+    function onDocumentMouseDown(event) {
+        event.preventDefault()
+        onPointerDownPointerX = event.clientX
+        onPointerDownPointerY = event.clientY
+        onPointerDownLon = lon
+        onPointerDownLat = lat
+        document.addEventListener('mousemove', onDocumentMouseMove, false)
+        document.addEventListener('mouseup', onDocumentMouseUp, false)
+    }
+
+    function onDocumentMouseMove(event) {
+        lon = (event.clientX - onPointerDownPointerX) * 0.1 + onPointerDownLon
+        lat = (event.clientY - onPointerDownPointerY) * 0.1 + onPointerDownLat
+    }
+
+    function onDocumentMouseUp(event) {
+        document.removeEventListener('mousemove', onDocumentMouseMove, false)
+        document.removeEventListener('mouseup', onDocumentMouseUp, false)
+    }
+
+    function onDocumentMouseWheel(event) {
+        // WebKit
+        if (event.wheelDeltaY) {
+            fov -= event.wheelDeltaY * 0.05
+                // Opera / Explorer 9
+        } else if (event.wheelDelta) {
+            fov -= event.wheelDelta * 0.05
+                // Firefox
+        } else if (event.detail) {
+            fov += event.detail * 1.0
+        }
+
+        camera.projectionMatrix.makePerspective(fov, window.innerWidth / window.innerHeight, 1, 1100)
+    }
+
+    function animate() {
+        requestAnimationFrame(animate)
+        render()
+    }
+
+    function render() {
+        var time = Date.now()
+        lat = Math.max(-85, Math.min(85, lat))
+        phi = THREE.Math.degToRad(90 - lat)
+        theta = THREE.Math.degToRad(lon)
+
+        for (var i = 0; i < 6; i++) {
+            if (i%2 == 0) {
+                objects[i].rotation.x += 0.0008
+                objects[i].rotation.y += 0.0009
+            } else{
+                objects[i].rotation.x -= 0.0008
+                objects[i].rotation.y -= 0.0009
+            }
+        }
+
+        camera.position.x = 100 * Math.sin(phi) * Math.cos(theta)
+        camera.position.y = 100 * Math.cos(phi)
+        camera.position.z = 100 * Math.sin(phi) * Math.sin(theta)
+        camera.lookAt(scene.position)
+        cubeCamera.updateCubeMap(renderer, scene)
+        camera.projectionMatrix.makePerspective(fov, window.innerWidth / window.innerHeight, 1, 1100)
+        renderer.render(scene, camera)
+    }
+
+    function getRandomArbitrary(min, max) {
+        return Math.random() * (max - min) + min
+    }
+
+    var url = 'textures/' + count.toString() + '.jpg'
+
+    var texture = THREE.ImageUtils.loadTexture(url, THREE.UVMapping, function() {
+        init()
+        animate()
+    })
+    </script>
+</body>
+
+</html>
